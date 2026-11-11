@@ -54,6 +54,8 @@ h1 em { color: var(--berry); }
 .party.right { transform: scaleX(-1); }
 .lead { margin-inline: auto !important; text-align: center; }
 .sign { text-align: center; }
+.sign .heart { color: var(--berry); vertical-align: -4px; margin-left: 4px; }
+.lead + .lead { margin-top: 14px !important; }
 .lead { max-width: 58ch; font-size: 1.1rem; color: var(--muted); margin: 0; }
 .lead strong { color: var(--ink); font-weight: 700; }
 .months { list-style: none; padding: 0; margin: 48px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
@@ -207,8 +209,10 @@ function renderHome() {
       <path d="M28 52l4 10"/><circle cx="62" cy="34" r="3"/><path d="M100 40l6 6M106 40l-6 6"/><path d="M16 120l8-2"/>
     </svg>
     </div>
-    <p class="lead">Mein Geschenk an dich sind <strong>sechs Monate</strong> mit <strong>einem Erlebnis pro Monat</strong>.
-    Wann es losgeht und wer dabei ist, siehst du schon jetzt. Alles andere wird dir hier je einen Tag vorher verraten.</p>
+    <p class="lead"><strong>Danke, dass du in meinem Leben bist!</strong></p>
+    <p class="lead">Da wir uns immer viel vornehmen, es aber leider nicht immer wie gewünscht klappt, dachte ich mir, wir stellen sicher, dass wir bzw. du mindestens einmal im Monat rauskommen und was erleben.
+    Mein Geschenk an dich sind <strong>sechs Monate</strong> mit <strong>einem Erlebnis pro Monat</strong>.
+    Wann es losgeht und wer dabei ist, wird dir schon jetzt geteasert. Weitere Teaser gibt es 7 Tage vorher in den Details und alles andere wird dir über den QR-Code einen Tag vorher verraten. Also nicht verlieren 😄</p>
     <ol class="months">
       ${EVENTS.map((ev, i) => {
         const ready = dateReached(ev) && ev.secret, tease = teaserVisible(ev);
@@ -223,7 +227,7 @@ function renderHome() {
           </div></a></li>`;
       }).join("")}
     </ol>
-    <p class="sign">In Liebe, Johannes</p>`;
+    <p class="sign">Ich liebe dich <svg class="heart" viewBox="0 0 24 24" width="26" height="26" aria-label="Herz"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.6.8-1.4 2.3-2.6 4.4-2.6 3.6 0 5.7 3.9 4.2 7.3C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg></p>`;
 }
 
 const LOCK_ICON = `<div class="seal" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>`;
