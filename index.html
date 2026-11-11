@@ -48,6 +48,12 @@ a:focus-visible { outline: 2px solid var(--berry); outline-offset: 3px; border-r
 .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
 h1 { font-family: var(--display); font-weight: 400; font-size: clamp(3.2rem, 11vw, 7rem); line-height: .95; margin: 12px 0 20px; text-wrap: balance; }
 h1 em { color: var(--berry); }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 5fr) minmax(0, 1fr); align-items: center; gap: clamp(8px, 2vw, 24px); margin-bottom: 24px; }
+.hero h1 { font-size: clamp(2.1rem, 8.4vw, 7rem); text-align: center; margin: 0; overflow-wrap: anywhere; }
+.party { width: 100%; height: auto; color: var(--ink); }
+.party.right { transform: scaleX(-1); }
+.lead { margin-inline: auto !important; text-align: center; }
+.sign { text-align: center; }
 .lead { max-width: 58ch; font-size: 1.1rem; color: var(--muted); margin: 0; }
 .lead strong { color: var(--ink); font-weight: 700; }
 .months { list-style: none; padding: 0; margin: 48px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
@@ -186,8 +192,21 @@ async function decrypt(secret, key) {
 function renderHome() {
   document.title = "Grits sechs Monate";
   app.innerHTML = `
-    <div class="eyebrow">Zum Geburtstag</div>
-    <h1>Alles Liebe,<br><em>Grit</em></h1>
+    <div class="hero">
+    <svg class="party left" viewBox="0 0 120 260" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <ellipse cx="42" cy="52" rx="26" ry="32"/><path d="M38 84l4 6 4-6z"/><path d="M42 90c-8 30 10 50 0 80s8 50 16 80"/>
+      <ellipse cx="84" cy="96" rx="24" ry="30"/><path d="M80 126l4 6 4-6z"/><path d="M84 132c6 26-12 44-4 70s-14 30-22 48"/>
+      <path d="M30 34c4-8 10-12 16-12"/><path d="M74 78c4-7 9-10 14-10"/>
+      <path d="M12 140l6 6M18 140l-6 6"/><circle cx="104" cy="30" r="4"/><path d="M98 170l8-4"/><path d="M20 208l6-8"/><circle cx="100" cy="226" r="3"/>
+    </svg>
+    <h1>ALLES GUTE ZUM GEBURTSTAG DU TOLLSTE FRAU DER WELT</h1>
+    <svg class="party right" viewBox="0 0 120 260" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M22 236l28-92 60 60z"/><path d="M36 190l34 34"/><path d="M44 164l40 40"/>
+      <path d="M58 132c-6-18 4-30 18-30"/><path d="M84 118c10-14 24-14 30-6"/><path d="M90 150c16-4 24 4 24 14"/>
+      <path d="M40 96l6 8M46 96l-6 8"/><circle cx="96" cy="78" r="4"/><path d="M70 64l10-6"/><path d="M104 104l8 2"/>
+      <path d="M28 52l4 10"/><circle cx="62" cy="34" r="3"/><path d="M100 40l6 6M106 40l-6 6"/><path d="M16 120l8-2"/>
+    </svg>
+    </div>
     <p class="lead">Mein Geschenk an dich sind <strong>sechs Monate</strong> mit <strong>einem Erlebnis pro Monat</strong>.
     Wann es losgeht und wer dabei ist, siehst du schon jetzt. Alles andere wird dir hier je einen Tag vorher verraten.</p>
     <ol class="months">
