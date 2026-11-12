@@ -127,6 +127,7 @@ h1 em { color: var(--berry); }
 <script>
 /* =====================================================================
    HIER ANPASSEN — die sechs Events.
+   id:      Fest mit dem QR-Code der Karte verbunden (#monat-ID). Nie ändern.
    date:    Startdatum JJJJ-MM-TT (optional mit Uhrzeit "2026-12-18T19:00")
    tbd:     true = Tag steht noch nicht fest, angezeigt wird "?. Monat Jahr"
    dauer:   Symbole in Reihenfolge: "sonne" (Tag), "mond" (Nacht)
@@ -138,12 +139,12 @@ h1 em { color: var(--berry); }
             und erst ab 1 Tag vor dem Event.
    ===================================================================== */
 const EVENTS = [
-  { date: "2026-12-18",            dauer: ["sonne"],                 group: ["frau", "frau"],                                      teaser: "", secret: "" },
-  { date: "2027-01-30",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau", "frau", "junge", "mann"],   teaser: "", secret: "" },
-  { date: "2027-02-20",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau"],                            teaser: "", secret: "" },
-  { date: "2027-03-01", tbd: true, dauer: [],                         group: ["frau", "frau"],                                      teaser: "", secret: "" },
-  { date: "2027-04-14",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau", "frau", "maedchen", "mann"], teaser: "", secret: "" },
-  { date: "2027-05-07",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau"],                            teaser: "", secret: "" },
+  { id: 1, date: "2026-12-18",            dauer: ["sonne"],                 group: ["frau", "frau"],                                      teaser: "", secret: "" },
+  { id: 2, date: "2027-01-30",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau", "frau", "junge", "mann"],   teaser: "", secret: "" },
+  { id: 3, date: "2027-02-20",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau"],                            teaser: "", secret: "" },
+  { id: 4, date: "2027-03-01", tbd: true, dauer: [],                         group: ["frau", "frau"],                                      teaser: "", secret: "" },
+  { id: 6, date: "2027-03-26",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau"],                            teaser: "", secret: "" },
+  { id: 5, date: "2027-04-14",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau", "frau", "maedchen", "mann"], teaser: "", secret: "" },
 ];
 const TEASER_DAYS_BEFORE = 7;
 const UNLOCK_DAYS_BEFORE = 1;
@@ -217,7 +218,7 @@ function renderHome() {
       ${EVENTS.map((ev, i) => {
         const ready = dateReached(ev) && ev.secret, tease = teaserVisible(ev);
         const label = ready ? "QR-Code scannen" : tease ? "Teaser da" : "Noch geheim";
-        return `<li><a class="ticket" href="#monat-${i + 1}">
+        return `<li><a class="ticket" href="#monat-${ev.id}">
           <div class="stub"><span class="lbl">Monat</span><span class="n">${i + 1}</span></div>
           <div class="tbody">
             <div class="tdate">${fmtDate(ev)}</div>
@@ -283,16 +284,16 @@ function renderEvent(i, key) {
 
 function parseHash() {
   const m = location.hash.match(/^#monat-(\d+)(?:~([A-Za-z0-9_-]+))?$/);
-  return m ? { i: Number(m[1]) - 1, key: m[2] || null } : null;
+  return m ? { id: Number(m[1]), key: m[2] || null } : null;
 }
 function route() {
   const h = parseHash();
-  if (h) renderEvent(h.i, h.key); else renderHome();
+  if (h) renderEvent(EVENTS.findIndex(e => e.id === h.id), h.key); else renderHome();
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
 route();
-setInterval(() => { const h = parseHash(); if (h) renderEvent(h.i, h.key); else renderHome(); }, 60000);
+setInterval(() => { const h = parseHash(); if (h) renderEvent(EVENTS.findIndex(e => e.id === h.id), h.key); else renderHome(); }, 60000);
 </script>
 </body>
 </html>
