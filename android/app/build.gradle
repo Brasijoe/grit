@@ -1,0 +1,53 @@
+plugins { id 'com.android.application' }
+
+// Der App-Schlüssel kommt aus dem GitHub-Secret GRIT_APP_KEY und steht nie im Repo.
+def appKey = System.getenv("GRIT_APP_KEY") ?: ""
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1") as int
+
+android {
+    namespace 'de.grit.teaser'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "de.grit.teaser"
+        minSdk 26
+        targetSdk 34
+        versionCode runNumber
+        versionName "1." + runNumber
+        buildConfigField "String", "APP_KEY", "\"${appKey}\""
+        buildConfigField "String", "SITE", "\"https://brasijoe.github.io/grit/\""
+    }
+    buildFeatures { buildConfig true }
+
+    signingConfigs {
+        grit {
+            storeFile file("grit.keystore")
+            storePassword "grit-geschenk"
+            keyAlias "grit"
+            keyPassword "grit-geschenk"
+        }
+    }
+
+    flavorDimensions "mode"
+    productFlavors {
+        grit {
+            dimension "mode"
+            buildConfigField "boolean", "TEST", "false"
+            resValue "string", "app_name", "6 Monate"
+        }
+        probe {
+            dimension "mode"
+            applicationIdSuffix ".test"
+            buildConfigField "boolean", "TEST", "true"
+            resValue "string", "app_name", "6 Monate Test"
+        }
+    }
+
+    buildTypes {
+        release { signingConfig signingConfigs.grit; minifyEnabled false }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
