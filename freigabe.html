@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Teaser-Freigabe</title>
+<style>
+:root { --bg: #fbf7f2; --card: #fff; --ink: #2a2320; --muted: #7a6d66; --line: #e8ded5; --berry: #a3324f; --ok: #2f7a4d; --test: #b7791f; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1b1716; --card: #252020; --ink: #f2ebe6; --muted: #b3a69f; --line: #3a3230; --berry: #e2738f; --ok: #6cc690; --test: #e0a84a; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; }
+h1 { font-size: 1.4rem; margin: 0 0 4px; }
+p.sub { color: var(--muted); margin: 0 0 20px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+.date { font-weight: 600; margin-bottom: 10px; }
+.item { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px; }
+.item:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.badge { font-size: .78rem; padding: 2px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.badge.on { color: var(--ok); border-color: var(--ok); }
+.badge.test { color: var(--test); border-color: var(--test); }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+textarea, input { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+textarea { min-height: 70px; resize: vertical; }
+textarea[readonly] { opacity: .75; }
+label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+.btns { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+button { font: inherit; font-size: .95rem; border: 0; border-radius: 10px; padding: 8px 14px; cursor: pointer; }
+button.primary { background: var(--berry); color: #fff; }
+button.test { background: transparent; color: var(--test); border: 1px solid var(--test); }
+button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+button:disabled { opacity: .5; cursor: default; }
+#msg { position: sticky; top: 0; z-index: 2; margin-bottom: 14px; }
+#msg:empty { display: none; }
+#msg div { background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 10px; }
+details summary { cursor: pointer; color: var(--muted); }
+.small { font-size: .85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Teaser-Freigabe</h1>
+  <p class="sub">Teaser vorbereiten und <b>Speichern</b> (Grit sieht nichts davon). <b>Test</b> schickt einen Teaser nur an deine Test-App. <b>Freigeben</b> schickt ihn an Grits App, mit Benachrichtigung.</p>
+  <div id="msg"></div>
+  <div id="list"></div>
+  <div class="card">
+    <div class="date">Test-App</div>
+    <p class="small">Teaser, die du testest, sieht nur die App „6 Monate Test“. Hier kannst du sie wieder leeren.</p>
+    <div class="btns"><button class="ghost" id="cleartest">Test-Teaser leeren</button></div>
+  </div>
+  <details class="card" id="setup">
+    <summary>Einrichtung</summary>
+    <label for="key">App-Schlüssel</label>
+    <input id="key" autocomplete="off" spellcheck="false">
+    <label for="tok">GitHub-Token (nur Repo „grit“, Recht „Contents: Read and write“)</label>
+    <input id="tok" type="password" autocomplete="off" spellcheck="false">
+    <div class="btns"><button class="primary" id="save">Speichern</button></div>
+  </details>
+</main>
+<script>
+const REPO = "Brasijoe/grit";
+const F = { live: "teaser.json", test: "teaser-test.json", drafts: "entwuerfe.json" };
+const EVENTS = [
+  { id: 1, label: "Monat 1 · 18. Dezember 2026" },
+  { id: 2, label: "Monat 2 · 30. Januar 2027" },
+  { id: 3, label: "Monat 3 · 20. Februar 2027" },
+  { id: 4, label: "Monat 4 · 26. März 2027" },
+  { id: 5, label: "Monat 5 · 14. April 2027" },
+  { id: 6, label: "Monat 6 · 7. Mai 2027" },
+];
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem("grit-admin-" + k) || ""; } catch (e) { return ""; } },
+  set(k, v) { try { localStorage.setItem("grit-admin-" + k, v); } catch (e) {} },
+};
+/* drafts = {eventId: [{uid, text}]}, liveUids/testUids = {eventId: [uid]} */
+let drafts = {}, liveUids = {}, testUids = {};
+
+function say(t) { $("msg").innerHTML = t ? `<div>${t}</div>` : ""; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+function toB64u(u8) { let s = ""; u8.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function uid() { return toB64u(crypto.getRandomValues(new Uint8Array(9))); }
+async function aesKey(use) { return crypto.subtle.importKey("raw", b64u(store.get("key")), "AES-GCM", false, [use]); }
+async function encrypt(obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await aesKey("encrypt"), new TextEncoder().encode(JSON.stringify(obj))));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return toB64u(out);
+}
+async function decrypt(secret) {
+  const raw = b64u(secret);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(0, 12) }, await aesKey("decrypt"), raw.slice(12));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+function utf8b64(str) { let s = ""; new TextEncoder().encode(str).forEach(b => s += String.fromCharCode(b)); return btoa(s); }
+function b64utf8(b) { return new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g, "")), c => c.charCodeAt(0))); }
+
+/* GitHub: Datei lesen ({data, sha}) und schreiben */
+async function ghGet(file) {
+  const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${file}`, { cache: "no-store", headers: { Authorization: "Bearer " + store.get("tok"), Accept: "application/vnd.github+json" } });
+  if (res.status === 404) return { data: {}, sha: null };
+  if (!res.ok) throw new Error("GitHub " + res.status + (res.status === 401 ? " (Token falsch oder abgelaufen)" : ""));
+  const f = await res.json();
+  return { data: JSON.parse(b64utf8(f.content)), sha: f.sha };
+}
+async function ghPut(file, data, sha, message) {
+  const body = { message, content: utf8b64(JSON.stringify(data, null, 1) + "\n") };
+  if (sha) body.sha = sha;
+  const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${file}`, { method: "PUT", headers: { Authorization: "Bearer " + store.get("tok"), Accept: "application/vnd.github+json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error("GitHub " + res.status + (res.status === 409 ? " (gerade geändert, bitte nochmal)" : ""));
+}
+
+/* Veröffentlicht: {eventId: [verschlüsselt {uid, id, text}]} */
+async function readPublished(file) {
+  const { data, sha } = await ghGet(file), uids = {}, items = {};
+  for (const [id, list] of Object.entries(data)) {
+    for (const s of [].concat(list)) {
+      try { const d = await decrypt(s); (uids[id] = uids[id] || []).push(d.uid); (items[id] = items[id] || []).push({ s, uid: d.uid }); } catch (e) {}
+    }
+  }
+  return { data, sha, uids, items };
+}
+async function readDrafts() {
+  const { data, sha } = await ghGet(F.drafts);
+  return { sha, drafts: data.v ? await decrypt(data.v) : {} };
+}
+async function load() {
+  drafts = (await readDrafts()).drafts;
+  liveUids = (await readPublished(F.live)).uids;
+  testUids = (await readPublished(F.test)).uids;
+}
+
+function collect() {
+  document.querySelectorAll("textarea[data-uid]").forEach(t => {
+    const d = (drafts[t.dataset.ev] || []).find(x => x.uid === t.dataset.uid);
+    if (d) d.text = t.value.trim();
+  });
+}
+async function saveDrafts() {
+  collect();
+  const local = drafts, { sha } = await readDrafts();
+  for (const id of Object.keys(local)) local[id] = local[id].filter(d => d.text || isLive(id, d.uid));
+  await ghPut(F.drafts, { v: await encrypt(local) }, sha, "Entwürfe");
+  drafts = local; store.set("dirty", "");
+}
+function isLive(id, u) { return (liveUids[id] || []).includes(u); }
+function isTest(id, u) { return (testUids[id] || []).includes(u); }
+
+async function publish(file, id, draft, add) {
+  const cur = await readPublished(file), data = cur.data;
+  const list = (cur.items[id] || []).filter(x => x.uid !== draft.uid).map(x => x.s);
+  if (add) list.push(await encrypt({ uid: draft.uid, id: Number(id), text: draft.text }));
+  if (list.length) data[id] = list; else delete data[id];
+  await ghPut(file, data, cur.sha, file === F.live ? "Teaser" : "Test");
+}
+
+function render() {
+  $("list").innerHTML = EVENTS.map(ev => {
+    const list = drafts[ev.id] || [];
+    return `<div class="card"><div class="date">${ev.label}</div>
+      ${list.map(d => {
+        const on = isLive(ev.id, d.uid), t = isTest(ev.id, d.uid);
+        return `<div class="item">
+          <div class="row"><div class="badges">
+            <span class="badge ${on ? "on" : ""}">${on ? "Freigegeben" : "Entwurf"}</span>
+            ${t ? `<span class="badge test">Im Test</span>` : ""}</div></div>
+          <textarea data-ev="${ev.id}" data-uid="${d.uid}" ${on ? "readonly" : ""} placeholder="Teaser …">${esc(d.text)}</textarea>
+          <div class="btns">
+            ${on ? `<button class="ghost" data-act="unrelease" data-ev="${ev.id}" data-uid="${d.uid}">Zurückziehen</button>`
+                 : `<button class="primary" data-act="release" data-ev="${ev.id}" data-uid="${d.uid}">Freigeben</button>
+                    <button class="test" data-act="test" data-ev="${ev.id}" data-uid="${d.uid}">${t ? "Erneut testen" : "Test"}</button>
+                    <button class="ghost" data-act="delete" data-ev="${ev.id}" data-uid="${d.uid}">Löschen</button>`}
+          </div></div>`;
+      }).join("")}
+      <div class="btns"><button class="ghost" data-act="add" data-ev="${ev.id}">+ Teaser</button>
+      ${list.length ? `<button class="ghost" data-act="save">Speichern</button>` : ""}</div></div>`;
+  }).join("");
+  document.querySelectorAll("textarea").forEach(t => t.addEventListener("input", () => store.set("dirty", "1")));
+}
+
+async function run(label, fn, done) {
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+  say(label);
+  try { await fn(); say(done); } catch (err) { say("Fehler: " + esc(err.message)); }
+  render();
+  document.querySelectorAll("button").forEach(b => b.disabled = false);
+}
+
+$("list").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-act]"); if (!btn) return;
+  const act = btn.dataset.act, id = btn.dataset.ev, u = btn.dataset.uid;
+  if (act === "add") { collect(); (drafts[id] = drafts[id] || []).push({ uid: uid(), text: "" }); render(); const ts = document.querySelectorAll(`textarea[data-ev="${id}"]`); ts[ts.length - 1].focus(); return; }
+  if (act === "save") return run("Speichert …", saveDrafts, "Gespeichert ✓");
+  collect();
+  const d = (drafts[id] || []).find(x => x.uid === u);
+  if (!d) return;
+  if (act === "delete") return run("Löscht …", async () => { drafts[id] = drafts[id].filter(x => x.uid !== u); await saveDrafts(); if (isTest(id, u)) await publish(F.test, id, d, false); await load(); }, "Gelöscht ✓");
+  if ((act === "release" || act === "test") && !d.text) { say("Bitte zuerst einen Text eingeben."); return; }
+  if (act === "test") return run("Schickt an die Test-App …", async () => { await saveDrafts(); await publish(F.test, id, d, true); await load(); }, "An die Test-App geschickt ✓ Öffne „6 Monate Test“, oder warte auf die Benachrichtigung (meist innerhalb von 15–20 Min.).");
+  if (act === "release") {
+    if (!confirm("Diesen Teaser jetzt für Grit freigeben? Sie bekommt eine Benachrichtigung.")) return;
+    return run("Wird freigegeben …", async () => { await saveDrafts(); await publish(F.live, id, d, true); await load(); }, "Freigegeben ✓ Grit bekommt ihn meist innerhalb von 15–20 Minuten.");
+  }
+  if (act === "unrelease") return run("Wird zurückgezogen …", async () => { await publish(F.live, id, d, false); await load(); }, "Zurückgezogen ✓ (eine schon gezeigte Benachrichtigung bleibt auf ihrem Handy)");
+});
+
+$("cleartest").addEventListener("click", () => run("Leert …", async () => { const { sha } = await ghGet(F.test); await ghPut(F.test, {}, sha, "Test"); await load(); }, "Test-Teaser geleert ✓"));
+$("save").addEventListener("click", () => { store.set("key", $("key").value.trim()); store.set("tok", $("tok").value.trim()); start(); });
+window.addEventListener("beforeunload", e => { if (store.get("dirty")) { e.preventDefault(); e.returnValue = ""; } });
+
+async function start() {
+  const m = location.hash.match(/^#([A-Za-z0-9_-]{40,})$/);
+  if (m) { store.set("key", m[1]); history.replaceState(null, "", location.pathname); }
+  $("key").value = store.get("key"); $("tok").value = store.get("tok");
+  if (!store.get("key") || !store.get("tok")) { $("setup").open = true; say("Einmalig einrichten: App-Schlüssel und GitHub-Token eintragen."); render(); return; }
+  try { await aesKey("encrypt"); } catch (e) { $("setup").open = true; say("Der App-Schlüssel stimmt nicht."); return; }
+  say("Lädt …");
+  try { await load(); $("setup").open = false; say(""); }
+  catch (err) { $("setup").open = true; say("Fehler: " + esc(err.message)); }
+  render();
+}
+start();
+</script>
+</body>
+</html>

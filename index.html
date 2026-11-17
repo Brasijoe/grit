@@ -113,7 +113,8 @@ h1 em { color: var(--berry); }
 .seal { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--berry); color: var(--paper); }
 .notfound { margin-top: 32px; }
 .teaser { padding: 28px clamp(20px, 5vw, 48px); border-bottom: 1px solid var(--line); }
-.teaser p { font-family: var(--display); font-style: italic; font-size: clamp(1.3rem, 4vw, 1.7rem); line-height: 1.3; margin: 6px 0 0; max-width: 40ch; }
+.teaser p + p { margin-top: 14px; }
+.teaser p { font-family: var(--display); font-style: italic; font-size: clamp(1.3rem, 4vw, 1.7rem); line-height: 1.3; margin: 6px 0 0; max-width: 40ch; white-space: pre-line; }
 .tteaser { font-family: var(--display); font-style: italic; font-size: 1.05rem; line-height: 1.3; color: var(--berry); }
 .lock .hint { color: var(--muted); max-width: 46ch; margin: 0; }
 .details .body { white-space: pre-line; }
@@ -132,21 +133,22 @@ h1 em { color: var(--berry); }
    tbd:     true = Tag steht noch nicht fest, angezeigt wird "?. Monat Jahr"
    dauer:   Symbole in Reihenfolge: "sonne" (Tag), "mond" (Nacht)
    group:   Wer dabei ist, in Reihenfolge: "mann", "frau", "junge", "maedchen"
-   teaser:  Kurzer Text, erscheint automatisch 7 Tage vorher.
-            Achtung: steht ab dem Eintragen im Quelltext.
+   Teaser:  stehen NICHT hier, sondern verschlüsselt in teaser.json
+            (Testversion: teaser-test.json). Johannes gibt sie über
+            freigabe.html frei. Lesbar nur in der App (Link
+            #app~APPSCHLÜSSEL bzw. #app~APPSCHLÜSSEL~test, wird gespeichert).
    secret:  Die verschlüsselten Details (mit tools/encrypt.mjs erzeugt).
             Nur mit dem Schlüssel aus dem QR-Code der Karte lesbar,
             und erst ab 1 Tag vor dem Event.
    ===================================================================== */
 const EVENTS = [
-  { id: 1, date: "2026-12-18",            dauer: ["sonne"],                 group: ["frau", "frau"],                                      teaser: "", secret: "" },
-  { id: 2, date: "2027-01-30",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau", "frau", "junge", "mann"],   teaser: "", secret: "" },
-  { id: 3, date: "2027-02-20",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau"],                            teaser: "", secret: "" },
-  { id: 4, date: "2027-03-26",            dauer: ["sonne"],                  group: ["frau", "frau"],                                      teaser: "", secret: "" },
-  { id: 5, date: "2027-04-14",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau", "frau", "maedchen", "mann"], teaser: "", secret: "" },
-  { id: 6, date: "2027-05-07",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau"],                            teaser: "", secret: "" },
+  { id: 1, date: "2026-12-18",            dauer: ["sonne"],                 group: ["frau", "frau"],                                      secret: "" },
+  { id: 2, date: "2027-01-30",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau", "frau", "junge", "mann"],   secret: "" },
+  { id: 3, date: "2027-02-20",            dauer: ["sonne", "mond", "sonne"], group: ["mann", "junge", "frau"],                            secret: "" },
+  { id: 4, date: "2027-03-26",            dauer: ["sonne"],                  group: ["frau", "frau"],                                      secret: "" },
+  { id: 5, date: "2027-04-14",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau", "frau", "maedchen", "mann"], secret: "" },
+  { id: 6, date: "2027-05-07",            dauer: ["mond", "sonne", "mond"],  group: ["mann", "junge", "frau"],                            secret: "" },
 ];
-const TEASER_DAYS_BEFORE = 7;
 const UNLOCK_DAYS_BEFORE = 1;
 /* ===================================================================== */
 
@@ -163,7 +165,7 @@ function parseDate(s) {
 function daysBefore(ev, n) { const d = parseDate(ev.date.split("T")[0]); d.setDate(d.getDate() - n); return d; }
 function unlockAt(ev) { return daysBefore(ev, UNLOCK_DAYS_BEFORE); }
 function dateReached(ev) { return !ev.tbd && new Date() >= unlockAt(ev); }
-function teaserVisible(ev) { return !!ev.teaser && !ev.tbd && new Date() >= daysBefore(ev, TEASER_DAYS_BEFORE); }
+function teaserVisible(ev) { return !!(TEASERS[ev.id] || []).length; }
 function fmt(d) { return d.getDate() + ". " + MONTHS[d.getMonth()] + " " + d.getFullYear(); }
 function fmtDate(ev) { const a = parseDate(ev.date); return ev.tbd ? "?. " + MONTHS[a.getMonth()] + " " + a.getFullYear() : fmt(a); }
 function weekday(ev) { return ev.tbd ? "" : DAYS[parseDate(ev.date).getDay()]; }
@@ -192,6 +194,33 @@ async function decrypt(secret, key) {
   return JSON.parse(new TextDecoder().decode(plain));
 }
 
+/* Teaser: verschlüsselt in teaser.json, Schlüssel nur in der App. */
+let TEASERS = {};
+const APP_KEY_STORE = "grit-app-key";
+let appKey = null, teaserFile = "teaser.json";
+try { appKey = localStorage.getItem(APP_KEY_STORE); teaserFile = localStorage.getItem(APP_KEY_STORE + "-file") || teaserFile; } catch (e) {}
+function takeAppKey() {
+  const m = location.hash.match(/^#app~([A-Za-z0-9_-]+?)(~test)?$/);
+  if (!m) return;
+  appKey = m[1]; teaserFile = m[2] ? "teaser-test.json" : "teaser.json";
+  try { localStorage.setItem(APP_KEY_STORE, appKey); localStorage.setItem(APP_KEY_STORE + "-file", teaserFile); } catch (e) {}
+  history.replaceState(null, "", location.pathname + location.search);
+}
+async function loadTeasers() {
+  if (!appKey) return;
+  try {
+    const res = await fetch(teaserFile + "?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const enc = await res.json(), next = {};
+    for (const [id, list] of Object.entries(enc)) {
+      for (const secret of [].concat(list)) {
+        try { const d = await decrypt(secret, appKey); if (d.text) (next[id] = next[id] || []).push(d.text); } catch (e) {}
+      }
+    }
+    if (JSON.stringify(next) !== JSON.stringify(TEASERS)) { TEASERS = next; refresh(); }
+  } catch (e) {}
+}
+
 function renderHome() {
   document.title = "Geburtstagsgeschenk Grit";
   app.innerHTML = `
@@ -213,7 +242,7 @@ function renderHome() {
     <p class="lead"><strong>Danke, dass du in meinem Leben bist!</strong></p>
     <p class="lead">Da wir uns immer viel vornehmen, es aber leider nicht immer wie gewünscht klappt, dachte ich mir, wir stellen sicher, dass wir bzw. du mindestens einmal im Monat rauskommen und was erleben.
     Mein Geschenk an dich sind <strong>sechs Monate</strong> mit <strong>einem Erlebnis pro Monat</strong>.
-    Wann es losgeht und wer dabei ist, wird dir schon jetzt geteasert. Weitere Teaser gibt es 7 Tage vorher in den Details und alles andere wird dir über den QR-Code einen Tag vorher verraten. Also nicht verlieren 😄</p>
+    Wann es losgeht und wer dabei ist, wird dir schon jetzt geteasert. Weitere Teaser gibt es vorab in den Details und alles andere wird dir über den QR-Code einen Tag vorher verraten. Also nicht verlieren 😄</p>
     <ol class="months">
       ${EVENTS.map((ev, i) => {
         const ready = dateReached(ev) && ev.secret, tease = teaserVisible(ev);
@@ -223,7 +252,7 @@ function renderHome() {
           <div class="tbody">
             <div class="tdate">${fmtDate(ev)}</div>
             <div class="tmeta">${group(ev)}${dauer(ev)}</div>
-            ${tease ? `<div class="tteaser">${esc(ev.teaser)}</div>` : ""}
+            ${tease ? `<div class="tteaser">${esc(TEASERS[ev.id][TEASERS[ev.id].length - 1])}</div>` : ""}
             <span class="status ${ready || tease ? "open" : ""}">${label}</span>
           </div></a></li>`;
       }).join("")}
@@ -276,7 +305,7 @@ function renderEvent(i, key) {
         <div class="fact"><div class="k">Wer ist dabei</div>${group(ev)}</div>
         ${(ev.dauer || []).length ? `<div class="fact"><div class="k">Dauer</div>${dauer(ev)}</div>` : ""}
       </div>
-      ${teaserVisible(ev) ? `<div class="teaser"><div class="k eyebrow">Teaser</div><p>${esc(ev.teaser)}</p></div>` : ""}
+      ${teaserVisible(ev) ? `<div class="teaser"><div class="k eyebrow">Teaser</div>${TEASERS[ev.id].map(t => `<p>${esc(t)}</p>`).join("")}</div>` : ""}
       <div id="slot"></div>
     </article>`;
   detailsBox(ev, key, token);
@@ -291,9 +320,13 @@ function route() {
   if (h) renderEvent(EVENTS.findIndex(e => e.id === h.id), h.key); else renderHome();
   window.scrollTo(0, 0);
 }
-window.addEventListener("hashchange", route);
+function refresh() { const h = parseHash(); if (h) renderEvent(EVENTS.findIndex(e => e.id === h.id), h.key); else renderHome(); }
+window.addEventListener("hashchange", () => { takeAppKey(); route(); loadTeasers(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) loadTeasers(); });
+takeAppKey();
 route();
-setInterval(() => { const h = parseHash(); if (h) renderEvent(EVENTS.findIndex(e => e.id === h.id), h.key); else renderHome(); }, 60000);
+loadTeasers();
+setInterval(() => { refresh(); loadTeasers(); }, 60000);
 </script>
 </body>
 </html>
