@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Teaser-Freigabe</title>
+<style>
+:root { --bg: #fbf7f2; --card: #fff; --ink: #2a2320; --muted: #7a6d66; --line: #e8ded5; --berry: #a3324f; --ok: #2f7a4d; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1b1716; --card: #252020; --ink: #f2ebe6; --muted: #b3a69f; --line: #3a3230; --berry: #e2738f; --ok: #6cc690; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; }
+h1 { font-size: 1.4rem; margin: 0 0 4px; }
+p.sub { color: var(--muted); margin: 0 0 20px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.date { font-weight: 600; }
+.badge { font-size: .8rem; padding: 2px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.badge.on { color: var(--ok); border-color: var(--ok); }
+.badge.changed { color: var(--berry); border-color: var(--berry); }
+textarea, input { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+textarea { min-height: 80px; resize: vertical; }
+label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+.btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+button { font: inherit; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+button.primary { background: var(--berry); color: #fff; }
+button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+button:disabled { opacity: .5; cursor: default; }
+#msg { position: sticky; top: 0; z-index: 2; margin-bottom: 14px; }
+#msg:empty { display: none; }
+#msg div { background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 10px; }
+details summary { cursor: pointer; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Teaser-Freigabe</h1>
+  <p class="sub">Text schreiben (wird nur hier auf dem Handy als Entwurf gespeichert), dann <b>Freigeben</b>. In der App ist der Teaser ca. 1–2 Minuten später zu sehen.</p>
+  <div id="msg"></div>
+  <div id="list"></div>
+  <details class="card" id="setup">
+    <summary>Einrichtung</summary>
+    <label for="key">App-Schlüssel</label>
+    <input id="key" autocomplete="off" spellcheck="false">
+    <label for="tok">GitHub-Token (nur Repo „grit“, Recht „Contents: Read and write“)</label>
+    <input id="tok" type="password" autocomplete="off" spellcheck="false">
+    <div class="btns"><button class="primary" id="save">Speichern</button></div>
+  </details>
+</main>
+<script>
+const REPO = "Brasijoe/grit", FILE = "teaser.json";
+const EVENTS = [
+  { id: 1, label: "Monat 1 · 18. Dezember 2026" },
+  { id: 2, label: "Monat 2 · 30. Januar 2027" },
+  { id: 3, label: "Monat 3 · 20. Februar 2027" },
+  { id: 4, label: "Monat 4 · 26. März 2027" },
+  { id: 5, label: "Monat 5 · 14. April 2027" },
+  { id: 6, label: "Monat 6 · 7. Mai 2027" },
+];
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem("grit-admin-" + k) || ""; } catch (e) { return ""; } },
+  set(k, v) { try { localStorage.setItem("grit-admin-" + k, v); } catch (e) {} },
+};
+let enc = {}, live = {}, sha = null;
+
+function say(t) { $("msg").innerHTML = t ? `<div>${t}</div>` : ""; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+function toB64u(u8) { let s = ""; u8.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+async function aesKey(use) { return crypto.subtle.importKey("raw", b64u(store.get("key")), "AES-GCM", false, [use]); }
+async function encrypt(obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await aesKey("encrypt"), new TextEncoder().encode(JSON.stringify(obj))));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return toB64u(out);
+}
+async function decrypt(secret) {
+  const raw = b64u(secret);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(0, 12) }, await aesKey("decrypt"), raw.slice(12));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+function utf8b64(str) { let s = ""; new TextEncoder().encode(str).forEach(b => s += String.fromCharCode(b)); return btoa(s); }
+function b64utf8(b) { return new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g, "")), c => c.charCodeAt(0))); }
+
+async function gh(method, body) {
+  const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${FILE}`, {
+    method, cache: "no-store",
+    headers: { Authorization: "Bearer " + store.get("tok"), Accept: "application/vnd.github+json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (method === "GET" && res.status === 404) return null;
+  if (!res.ok) throw new Error("GitHub " + res.status + (res.status === 401 ? " (Token falsch oder abgelaufen)" : res.status === 409 ? " (gerade geändert, nochmal versuchen)" : ""));
+  return res.json();
+}
+
+async function load() {
+  const f = await gh("GET");
+  sha = f ? f.sha : null;
+  enc = f ? JSON.parse(b64utf8(f.content)) : {};
+  live = {};
+  for (const [id, s] of Object.entries(enc)) {
+    try { live[id] = (await decrypt(s)).text; } catch (e) { live[id] = null; }
+  }
+}
+
+function render() {
+  $("list").innerHTML = EVENTS.map(ev => {
+    const draft = store.get("draft-" + ev.id), on = live[ev.id] != null && live[ev.id] !== "";
+    const text = draft !== "" ? draft : (live[ev.id] || "");
+    return `<div class="card">
+      <div class="row"><span class="date">${ev.label}</span><span class="badge" id="b${ev.id}"></span></div>
+      <textarea id="t${ev.id}" placeholder="Teaser für dieses Event …">${esc(text)}</textarea>
+      <div class="btns">
+        <button class="primary" data-act="release" data-id="${ev.id}">Freigeben</button>
+        ${on ? `<button class="ghost" data-act="hide" data-id="${ev.id}">Zurückziehen</button>` : ""}
+      </div></div>`;
+  }).join("");
+  EVENTS.forEach(ev => { badge(ev.id); $("t" + ev.id).addEventListener("input", e => { store.set("draft-" + ev.id, e.target.value); badge(ev.id); }); });
+}
+function badge(id) {
+  const b = $("b" + id), t = $("t" + id).value.trim(), l = live[id];
+  if (l == null || l === "") { b.className = "badge"; b.textContent = "Nicht freigegeben"; }
+  else if (t !== l) { b.className = "badge changed"; b.textContent = "Geändert, nicht freigegeben"; }
+  else { b.className = "badge on"; b.textContent = "Freigegeben"; }
+}
+
+async function publish(id, text) {
+  const next = { ...enc };
+  if (text) next[id] = await encrypt({ id, text }); else delete next[id];
+  const body = { message: "Teaser aktualisiert", content: utf8b64(JSON.stringify(next, null, 1) + "\n") };
+  if (sha) body.sha = sha;
+  const r = await gh("PUT", body);
+  sha = r.content.sha; enc = next;
+  if (text) live[id] = text; else delete live[id];
+  store.set("draft-" + id, "");
+}
+
+$("list").addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-act]"); if (!btn) return;
+  const id = Number(btn.dataset.id), text = $("t" + id).value.trim();
+  if (btn.dataset.act === "release" && !text) { say("Bitte zuerst einen Text eingeben."); return; }
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+  say(btn.dataset.act === "release" ? "Wird freigegeben …" : "Wird zurückgezogen …");
+  try {
+    await load();
+    await publish(id, btn.dataset.act === "release" ? text : "");
+    render();
+    say(btn.dataset.act === "release" ? "Freigegeben ✓ In der App in ca. 1–2 Minuten sichtbar." : "Zurückgezogen ✓");
+  } catch (err) { say("Fehler: " + esc(err.message)); }
+  document.querySelectorAll("button").forEach(b => b.disabled = false);
+});
+
+$("save").addEventListener("click", () => { store.set("key", $("key").value.trim()); store.set("tok", $("tok").value.trim()); start(); });
+
+async function start() {
+  const m = location.hash.match(/^#([A-Za-z0-9_-]{40,})$/);
+  if (m) { store.set("key", m[1]); history.replaceState(null, "", location.pathname); }
+  $("key").value = store.get("key"); $("tok").value = store.get("tok");
+  if (!store.get("key") || !store.get("tok")) { $("setup").open = true; say("Einmalig einrichten: App-Schlüssel und GitHub-Token eintragen."); render(); return; }
+  try { await aesKey("encrypt"); } catch (e) { $("setup").open = true; say("Der App-Schlüssel stimmt nicht."); return; }
+  say("Lädt …");
+  try { await load(); $("setup").open = false; say(""); }
+  catch (err) { $("setup").open = true; say("Fehler: " + esc(err.message)); }
+  render();
+}
+start();
+</script>
+</body>
+</html>
